@@ -1,0 +1,58 @@
+---
+title: "Capstone Project Proposal (Revised)"
+author: "Kimberly Kaufman"
+date: "March 11, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Abstract
+
+This project aims to predict what types of customers can be expected to purchase/subscribe a term deposit product, and therefore should be targeted in future marketing campaigns.  By analyzing 2.5 years' of direct marketing campaign data from a Portuguese banking institution, we can predict what subset of customers can be expected to purchase this product.
+
+### Analysis Approach
+
+The dependent variable we are trying to predict is listed as "y", which is categorical and contains two possible values: "yes" and "no"--the former indicates the customer did purchase the term deposit product, the latter indicates the customer did not purchase the term deposit product.  The independent variables (TBD) will be used in a logistic regression model in order to determine which variables are significant predictors of the "y" variable.
+
+### Data
+
+All banking data is available through the UCI Machine Learning Repository as four CSV files, two of which will be used for this analysis: the full data set & a potential test set (comprised of a randomly selected 10% of the full data set). All files can be accessed [here](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing) via the UCI archive.
+
+This data set is relatively clean and absent of NA values, so minimal data wrangling will need to be performed on missing values.
+
+The full data set consists of 41,188 observations of 21 variables.  Each observation represents a unique client.
+
+The attributes of the training dataset include:
+    
+* 7 customer demographic attributes
+    + Age, job, marital, education, default, housing, loan (categorical)
+* 8 marketing campaign attributes
+    + Contact, month, day of week, poutcome (categorical) 
+    + Duration, campaign, pdays, previous (continuous; numeric) 
+* 5 social and economic context attributes
+    + Emp.var.rate, cons.price.idx, cons.conf.idx, euribor3m, nr.employed (continuous; numeric) 
+    + Note: these abbreviations represent employment variation rate, consumer price index, consumer confidence index, euribor 3 month rate, and number of employees, respectively. 
+* 1 output variable / target
+    + Y (categorical; binary) 
+    
+The test dataset header is shown below:
+
+```{r code chunk #2, echo = FALSE, warning = FALSE}
+library(data.table)
+#library(dplyr)
+setwd('C:/Users/kkaufman/Documents/Data Sci/Capstone/UCI/UCI bank files')
+bankfull <- fread('bank-additional/bank-additional-full.csv')
+knitr::kable(head(bankfull), caption = "Sample of bank marketing data")
+
+```
+
+### Deliverables
+
+The primary deliverables are the code used to execute the analysis described above.
+
+I will also deliver a paper and slide deck which will communicate the analysis process and the findings. The paper and slide deck will be presented at Springboard's Introduction to Data Science office hours.
+
+All final deliverables, as well as intermediate deliverables, will be made available on the project's [GitHub Repository](https://github.com/kaufkauf/Capstone-Project-v2).
