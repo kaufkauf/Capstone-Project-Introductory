@@ -1,0 +1,76 @@
+---
+title: "Capstone Project Data Wrangling (Revised)"
+author: "Kimberly Kaufman"
+date: "March 13, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Introduction
+
+The following steps were taken to clean and wrangle the bank marketing data provided by the UCI Machine Learning Repository. This data will be used to predict the profile of potential customers most likely to subscribe/purchase a term deposit option.
+
+For more details on this project, see the GitHub respository at <https://github.com/kaufkauf/Capstone-Project-v2>.
+
+
+### Step 1: Missing Values
+
+There were no missing values to be found in this dataset, as it is relatively clean and completely absent of blank or NA values.  The only value that could be classified in this category is a handful of "unknown" observations in some of the categorical variables, which can be dealt with on a case-by-case basis.
+
+
+### Step 2: Outliers
+
+Again, as this dataset is already quite clean, there were not a lot of statistical outliers in our numeric values.  As an example, see below for a summary of the "age" variable:
+
+```{r code chunk #1, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+library(data.table)
+setwd('C:/Users/kkaufman/Documents/Data Sci/Capstone/UCI/UCI bank files/bank-additional')
+bankfull <- fread('bank-additional-full.csv')
+banksamp <- fread('bank-additional.csv')
+summary(bankfull$age)
+
+```
+
+This variable has values all within a reasonable range--the min at 17 makes sense, as does the max at 98.
+
+However, we do have one potential outlier in the "pdays" variable, which represents the number of days that passed by after the client was last contacted from a previous campaign. One can see from looking at the unique values that typical observations for this variable range anywhere between 0 and 30. Outside of that range, observations jump to an outlier of 999, which is a value that indicates the client was not previously contacted.
+
+However, we can also see that 999 values represent over 96% of the total observations.  Depending on whether or not we want to use this variable, we may want to replace the 999s with NAs to keep them from skewing the data.
+
+
+```{r code chunk #2, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+library(dplyr)
+unique(bankfull$pdays)
+summary(bankfull$pdays)
+bankfull %>%
+  filter(pdays == 999) %>%
+  summarize(percent_pdays_at_999 = n()/41188)
+
+```
+
+
+### Steps 3 & 4: Continuous and categorical variables
+
+Categorical variables
+
+The following variables in this dataset are categorical, including the dependent variable which is binary:
+    
+* 7 customer demographic attributes
+    + Age, job, marital, education, default, housing, loan
+* 4 marketing campaign attributes
+    + Contact, month, day of week, poutcome
+* 1 output variable / target
+    + Y
+
+Continuous variables
+
+The following variables in this dataset are both continuous and numeric:    
+
+* 4 marketing campaign attributes  
+    + Duration, campaign, pdays, previous
+* 5 social and economic context attributes
+    + Emp.var.rate, cons.price.idx, cons.conf.idx, euribor3m, nr.employed
+    + Note: these abbreviations represent employment variation rate, consumer price index, consumer confidence index, euribor 3 month rate, and number of employees, respectively. 
