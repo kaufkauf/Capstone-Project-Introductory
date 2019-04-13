@@ -1,0 +1,110 @@
+---
+title: "Capstone Project Statistics"
+author: "Kimberly Kaufman"
+date: "April 9, 2019"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+*****
+
+
+### Basic Statistical Insights
+
+As this project aims to predict the y variable (whether or not the customer will subscribe to a term deposit), it is worth looking at the full set of y observations to get a basic understanding of what distribution of values we should expect.  From a quick summary, we can see that 11.3% of our observations (unique clients) subscribed to the term deposit option, which means we should be expecting a similar proportion from the final predictions of our model.
+    
+\  
+
+##### **Y Variable Summary**
+```{r code chunk a, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+library(data.table)
+library(dplyr)
+library(caret)
+library(ROCR)
+
+#read in data sets
+setwd('C:/Users/kkaufman/Documents/Data Sci/Capstone/UCI/UCI bank files/bank-additional')
+bankfull <- fread('bank-additional-full.csv')
+
+#counts of y
+bankfull %>%
+  group_by(y) %>%
+  summarize(count = n(), perc = n()/41188)
+```
+
+\  
+
+
+### Categorical Variable Patterns
+
+When looking at our categorical variables, certain variables provide insight into which values are more or less highly correlated with a y value of "yes."  For example, a bar chart faceted by contact method provides an interesting look into which are more successful.
+
+\  
+
+##### **Y Variable by Contact Method**
+```{r code chunk b, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+#differences in contact
+ggplot(bankfull, aes(x= y,  group = contact)) + 
+  geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count", show.legend = FALSE) +
+  geom_text(aes(label = scales::percent(..prop..),
+                 y = ..prop.. ), stat= "count", vjust = -.5) +
+  labs(y = "Percent", fill="y") +
+  facet_grid( ~ contact) +
+  scale_y_continuous(labels = scales::percent)
+```
+
+We can infer from this bar chart that when contacting clients at a cellular number, there is a 14.7% probability that they subscribe to a term deposit.  This is a much higher probability than that of contacting clients at a landline telephone, which only has a 5.2% probability of the client subscribing to a term deposit.  This may indicate that contacting clients at their cellular numbers is more successful than contacting them at their landline numbers, and this variable may prove to be important to our model.
+
+However, there are other variables that prove to be less illuminating.  Most of the rest of our categoricals have relatively identical distributions between the two possible "y" values.  As an example, see the education variable.
+
+\  
+
+##### **Y Variable by Education Level**
+```{r code chunk c, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+#differences in education
+ggplot(bankfull, aes(x= y,  group = education)) + 
+  geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count", show.legend = FALSE) +
+  geom_text(aes(label = scales::percent(..prop..),
+                 y = ..prop.. ), stat= "count", vjust = -.5) +
+  labs(y = "Percent", fill="y") +
+  facet_grid( ~ education) +
+  scale_y_continuous(labels = scales::percent)
+```
+
+We can infer from this graphic that there is a 22.2% probability that clients who are illiterate will subscribe to a term deposit.  However, every other education level has a relatively similar distribution of probabilities, which means this variable may be less valuable than the contact method variable.
+
+\  
+
+### Continuous Variable Patterns
+
+When it comes to continuous variables, time series are not an option since we do not have significant enough date variables.  However, there are some other plotting tools that can give us insight.
+
+Frequency histograms can be helpful in visually identifying statistical outliers.  For example, see the below histogram that represents the "age" variable, which represents the ages of the unique clients in this dataset.
+
+\  
+
+##### **Outliers in Age Variable**
+```{r code chunk d, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+#age histogram as outlier example
+hist(bankfull$age, col = blues9)
+```
+
+We can see from this histogram that there are outliers on the higher end of the age variable, which means an outlier treatment will need to be decided for this variable in the data wrangling process.
+
+As most of our continuous variables do not have a large range of applicable values, there are not a lot of useful scatterplots to be drawn here.  However, there is one rather intuitive but interesting pattern that can be derived from looking at age vs duration of telemarketing call.  See below.
+
+\  
+
+##### **Age vs Call Duration**
+```{r code chunk e, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+bankfull %>%
+  filter(duration != 0) %>%
+  ggplot(aes(x = age, y = duration, col = y)) +
+  geom_jitter(alpha = 0.2) +
+  geom_smooth(method = lm, se = FALSE)
+```
+
+We can see a few things from this scatterplot and the lines plotted to each of our y values.  First, that the clients that did subscribe to the term deposit option tended to have higher call durations than those that did not, which makes sense.  Second, that call duration tends to decrease as age increases.  It's possible that this means there's a slightly higher chance of the client purchasing the product if they are on the younger side, since these clients would have longer call durations, but more investigation will need to be done.
