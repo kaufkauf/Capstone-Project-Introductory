@@ -1,0 +1,99 @@
+---
+title: "Capstone Data Story"
+author: "Kimberly Kaufman"
+date: "April 9, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+*****
+
+
+### Abstract
+
+This project aims to predict which types of customers can be expected to subscribe to a term deposit product at a bank, and therefore should be targeted in current and future telemarketing campaigns. By analyzing 2.5 years' of direct marketing campaign data from an unnamed Portuguese banking institution (via the UCI Machine Learning Repository), we can predict which subset of customers can be expected to purchase this product. This information provides valuable marketing insights that the banking industry can use to better target their potential customers.
+
+\  
+
+### Data Set
+
+This project uses the Bank Marketing Data Set from the UCI Machine Learning Repository, available [here](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing) via the UCI archive. The data was originally obtained and condensed for a published study in the June 2014 issue of Decision Support Systems that analyzed the success of telemarketing calls for selling bank long-term deposits.  The data was collected from 2008 to 2013, therefore including the effects of the financial crisis, and was then reduced from 150 to 22 features.
+
+All banking data is available as four CSV files, the largest of which will be used for this analysis: bank-additional-full.csv.  The full data set consists of 41,188 observations of 21 variables.  Each observation represents a unique client.
+
+The attributes of the training dataset include:
+    
+* 7 customer demographic attributes
+    + Age, job, marital, education, default, housing, loan (categorical)
+* 8 marketing campaign attributes
+    + Contact, month, day of week, poutcome (categorical) 
+    + Duration, campaign, pdays, previous (continuous; numeric) 
+* 5 social and economic context attributes
+    + Emp.var.rate, cons.price.idx, cons.conf.idx, euribor3m, nr.employed (continuous; numeric) 
+    + Note: these abbreviations represent employment variation rate, consumer price index, consumer confidence index, Euribor 3 month rate, and number of employees, respectively. 
+* 1 output variable / target
+    + Y (categorical; binary)
+    
+\  
+
+**Full Data Structure**    
+```{r code chunk h, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+library(data.table)
+library(dplyr)
+library(caret)
+library(ROCR)
+
+#read in data sets
+setwd('C:/Users/kkaufman/Documents/Data Sci/Capstone/UCI/UCI bank files/bank-additional')
+bankfull <- fread('bank-additional-full.csv')
+#transform to data frame
+bankfull <- as.data.frame(bankfull)
+str(bankfull)
+```
+
+
+\  
+
+### Initial Data Wrangling
+
+This data set is relatively clean due to its use in a previous analysis, so minimal data wrangling was required.  The data was checked for missing and NA values, and none were found.  There were, however, a handful of outliers in our numeric variables. As an example, let's take a look at a frequency histogram of the "age" variable, which represents the age in years of the client.
+
+```{r code chunk c, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+#age histogram as outlier example
+hist(bankfull$age, col = blues9)
+```
+
+We can see from looking at this visualization that there is a long tail of outliers to the right of the majority of our distribution.  In order to get a closer look at where the outliers begin, we can observe the range of ages by percentile.
+
+\  
+
+##### **Age Variable by Percentile**
+```{r code chunk d, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+quantile(bankfull$age, c(1:20)/20)
+```
+
+\  
+
+Since we can see that the large outliers indicated in the histogram occur after the 95th percentile, we can consider using a capping/flooring approach to outliers for this exercise.  After performing this type of exploratory analysis on the rest of the numeric variables, caps were set at the 5th and 95th percentiles, and all outliers were imputed with those caps.
+
+Due to the relatively even mix of continous and categorical variables, one-hot encoding was considered for categoricals in order to provide more numerous and accurate modeling possibilities.  However, most of our categoricals had a large number of possible values, resulting in 29 extra dummy variables and 38 total variables.  As this amount of variables proved to be unmanageable, an alternate approach was required instead.  Let's take a look at the "job" variable as an example, which represents the client's profession.
+
+\  
+
+##### **Job Variable by Unique Values**
+```{r code chunk e, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+table(bankfull$job)
+```
+
+\  
+
+We can see that there are 12 unique values to this variable, though it is unlikely we will need to utilize all of them in the model.  Working from the smallest number of observations up, we can group the less significant values such as unknown, student, unemployed, housemaid, self-employed, entrepreneur, retired, and management into one consolidated group labeled "other."  This reduces our variable to 5 unique variables, which is then converted to a factor with 5 levels.  This procedure was performed on all categorical variables with more than a handful of unique values.
+
+\  
+
+### Initial findings & approach revisions
+
+Based on these findings, the original idea of converting all categoricals with one-hot encoding and modeling off a completely numerical data set will no longer be a feasible option due to the large range of values in each categorical variable.  Instead, a logistic regression model will be used on a combination of factored categorical and numerical variables in order to predict the y variable.
