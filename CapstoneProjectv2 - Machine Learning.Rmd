@@ -1,0 +1,35 @@
+---
+title: "Capstone Project Machine Learning"
+author: "Kimberly Kaufman"
+date: "April 16, 2019"
+output: html_document
+---
+
+*****
+
+
+### Problem Setup
+
+Given the data provided, how can we predict which types of customers can be expected to subscribe to a term deposit product at a bank, and therefore should be targeted in current and future telemarketing campaigns?  
+
+The dependent variable we are trying to predict is listed as "y", which is categorical, binary, and consisting of two possible values: "yes" and "no."  Because we have a target variable in mind and a specific set of values we are trying to predict, we will be implementing *supervised* machine learning.  Since we will be predicting a probability to convert into our ultimate target binary variable, the problem is more of a regression than a classification problem.  Specifically, we will be using logistic regression.
+
+\  
+
+### Features
+
+In order to predict our y variable, we will be using a condensed set of features from the original dataset.  After all data wrangling and outlier treatments are performed, the remaining variables will need to be cleansed of variables with zero variance, near zero variance, and high correlation.  The remaining variables will be fed into a basic logistic regression model using the Caret package.
+
+\  
+
+### Machine Learning Technique
+
+Starting with the full data set, data will be partitioned into training and test sets using a 90%/10% split, respectively.  A generalized linear model, the simplest form of logistic regression available in the Caret package, will be used in training.  It will be fitted on a "ROC" metric using a k-fold cross-validation setup.  The model will then be used to make predictions on the test set, providing outputs in the form of probabilities.
+
+\  
+
+### Model Evaluation
+
+Evaluation of model performance can be performed in a couple of different ways: ROC and a precision/recall curve.  These approaches will both be used as exploratory methods to visualize the different ways to determine threshold value for our predictions.  Once a threshold value is selected, this t-value will determine for each probability whether the client will subscribe (yes or no) to a term deposit option.
+
+Selecting a cross validation approach requires us to circle back to the initial problem being solved.  In this case, we are solving a marketing problem in trying to determine which types of customers to target.  Since this problem is more concerned with marketing to the most inclusive and correct subset of customers, it is focused on determining the optimal number of true positives.  For this reason, the ROC curve is the best approach for thresholding since it best allows us to prioritize this measure.
