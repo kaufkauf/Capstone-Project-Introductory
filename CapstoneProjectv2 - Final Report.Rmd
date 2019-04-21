@@ -1,0 +1,275 @@
+---
+title: "Capstone Project Final Report"
+author: "Kimberly Kaufman"
+date: "April 17, 2019"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+subtitle: Predicting the ultimate customer in Portuguese bank marketing
+header-includes:
+- \usepackage{setspace}\singlespacing
+- \usepackage{float}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+*****
+
+
+### Abstract
+
+This project aims to predict which types of customers can be expected to subscribe to a term deposit product at a bank, and therefore should be targeted in current and future telemarketing campaigns. By analyzing 2.5 years' of direct marketing campaign data from an unnamed Portuguese banking institution (via the UCI Machine Learning Repository), we can predict which subset of customers can be expected to purchase this product. This information provides valuable marketing insights that the banking industry can use to better target their potential customers.
+
+\  
+
+### Analysis Approach
+
+The dependent variable we are trying to predict is listed as "y", which is categorical, binary, and consisting of two possible values: "yes" and "no." The former indicates that the customer did subscribe to the term deposit product, the latter indicates the customer did not subscribe to the term deposit product.  A subset of the other 20 available variables will be used in a logistic regression model in order to predict which customers can be expected to subscribe to a term deposit, represented by a "yes" observation of the y variable.
+
+\  
+
+### Data
+
+This project uses the Bank Marketing Data Set from the UCI Machine Learning Repository, available [here](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing) via the UCI archive. The data was originally obtained and condensed for a published study in the June 2014 issue of Decision Support Systems^1^ that analyzed the success of telemarketing calls for selling bank long-term deposits.  The data was collected from 2008 to 2013, therefore including the effects of the financial crisis, and was then reduced from 150 to 22 features.
+
+All banking data is available as four CSV files, the largest of which will be used for this analysis: bank-additional-full.csv.  The full data set consists of 41,188 observations of 21 variables.  Each observation represents a unique client.
+
+The attributes of the training dataset include:
+    
+* 7 customer demographic attributes
+    + Age, job, marital, education, default, housing, loan (categorical)
+* 8 marketing campaign attributes
+    + Contact, month, day of week, poutcome (categorical) 
+    + Duration, campaign, pdays, previous (continuous; numeric) 
+* 5 social and economic context attributes
+    + Emp.var.rate, cons.price.idx, cons.conf.idx, euribor3m, nr.employed (continuous; numeric) 
+    + Note: these abbreviations represent employment variation rate, consumer price index, consumer confidence index, Euribor 3 month rate, and number of employees, respectively. 
+* 1 output variable / target
+    + Y (categorical; binary)
+    
+\  
+
+##### **Full Data Structure**    
+```{r code chunk h, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+library(data.table)
+library(dplyr)
+library(caret)
+library(ROCR)
+
+#read in data sets
+setwd('C:/Users/kkaufman/Documents/Data Sci/Capstone/UCI/UCI bank files/bank-additional')
+bankfull <- fread('bank-additional-full.csv')
+#transform to data frame
+bankfull <- as.data.frame(bankfull)
+str(bankfull)
+```
+
+\  
+
+### Data Wrangling
+
+This data set is relatively clean due to its use in a previous analysis, so minimal data wrangling was required.  The data was checked for missing and NA values, and none were found.  There were, however, a handful of outliers in our numeric variables. As an example, let's take a look at a frequency histogram of the "age" variable, which represents the age in years of the client.
+
+```{r code chunk c, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+#age histogram as outlier example
+hist(bankfull$age, col = blues9)
+```
+
+We can see from looking at this visualization that there is a long tail of outliers to the right of the majority of our distribution.  In order to get a closer look at where the outliers begin, we can observe the range of ages by percentile.
+
+\  
+
+##### **Age Variable by Percentile**
+```{r code chunk d, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+quantile(bankfull$age, c(1:20)/20)
+```
+
+\  
+
+Since we can see that the large outliers indicated in the histogram occur after the 95th percentile, we can consider using a capping/flooring approach to outliers for this exercise.  After performing this type of exploratory analysis on the rest of the numeric variables, caps were set at the 5th and 95th percentiles, and all outliers were imputed with those caps.
+
+Due to the relatively even mix of continous and categorical variables, one-hot encoding was considered for categoricals in order to provide more numerous and accurate modeling possibilities.  However, most of our categoricals had a large number of possible values, resulting in 29 extra dummy variables and 38 total variables.  As this amount of variables proved to be unmanageable, an alternate approach was required instead.  Let's take a look at the "job" variable as an example, which represents the client's profession.
+
+\  
+
+##### **Job Variable by Unique Values**
+```{r code chunk e, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+table(bankfull$job)
+```
+
+\  
+
+We can see that there are 12 unique values to this variable, though it is unlikely we will need to utilize all of them in the model.  Working from the smallest number of observations up, we can group the less significant values such as unknown, student, unemployed, housemaid, self-employed, entrepreneur, retired, and management into one consolidated group labeled "other."  This reduces our variable to 5 unique variables, which is then converted to a factor with 5 levels.  This procedure was performed on all categorical variables with more than a handful of unique values.
+
+After these steps, the data was also checked for variables with zero variance, near zero variance, and high correlation.  A quick check for NZV revealed one variable with zero variance.  Our numerical variables alone were checked for highly correlated variables, which returned a total of three variables.  All four of these NZV and correlated variables were removed in order to prevent them from slowing down or skewing our model.
+
+\  
+
+##### **Variables with Zero and Near Zero Variance**
+```{r code chunk f, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+#functions for outlier imputation
+lowerbound <- function(x){
+  y1 <- quantile(x, .05, names = FALSE)
+  return(y1)
+}
+
+upperbound <- function(x){
+  y2 <- quantile(x, .95, names = FALSE)
+  return(y2)
+}
+
+#manual outlier imputation
+bankfull <- bankfull %>%
+  mutate(age = ifelse(age < lowerbound(age), lowerbound(age), ifelse(age > upperbound(age), upperbound(age), age))) %>%
+  mutate(duration = ifelse(duration < lowerbound(duration), lowerbound(duration), ifelse(duration > upperbound(duration), upperbound(duration), duration))) %>%
+  mutate(campaign = ifelse(campaign < lowerbound(campaign), lowerbound(campaign), ifelse(campaign > upperbound(campaign), upperbound(campaign), campaign))) %>%
+  mutate(pdays = ifelse(pdays < lowerbound(pdays), lowerbound(pdays), ifelse(pdays > upperbound(pdays), upperbound(pdays), pdays))) %>%
+  mutate(previous = ifelse(previous < lowerbound(previous), lowerbound(previous), ifelse(previous > upperbound(previous), upperbound(previous), previous))) %>%
+  mutate(emp.var.rate = ifelse(emp.var.rate < lowerbound(emp.var.rate), lowerbound(emp.var.rate), ifelse(emp.var.rate > upperbound(emp.var.rate), upperbound(emp.var.rate), emp.var.rate))) %>%
+  mutate(cons.price.idx = ifelse(cons.price.idx < lowerbound(cons.price.idx), lowerbound(cons.price.idx), ifelse(cons.price.idx > upperbound(cons.price.idx), upperbound(cons.price.idx), cons.price.idx))) %>%
+  mutate(cons.conf.idx = ifelse(cons.conf.idx < lowerbound(cons.conf.idx), lowerbound(cons.conf.idx), ifelse(cons.conf.idx > upperbound(cons.conf.idx), upperbound(cons.conf.idx), cons.conf.idx))) %>%
+  mutate(euribor3m = ifelse(euribor3m < lowerbound(euribor3m), lowerbound(euribor3m), ifelse(euribor3m > upperbound(euribor3m), upperbound(euribor3m), euribor3m))) %>%
+  mutate(nr.employed = ifelse(nr.employed < lowerbound(nr.employed), lowerbound(nr.employed), ifelse(nr.employed > upperbound(nr.employed), upperbound(nr.employed), nr.employed)))
+
+#group categoricals & convert to factors
+bankfull <- bankfull %>%
+  mutate(job = as.factor(ifelse(job %in% c("housemaid","management","entrepreneur","retired","self-employed","student","unemployed","unknown"),"other",job))) %>%
+  mutate(marital = as.factor(marital)) %>%
+  mutate(education = as.factor(ifelse(education %in% c("illiterate","unknown","basic.6y","basic.4y"),"other",education))) %>%
+  mutate(default = as.factor(default)) %>%
+  mutate(housing = as.factor(housing)) %>%
+  mutate(loan = as.factor(loan)) %>%
+  mutate(contact = as.factor(contact)) %>%
+  mutate(month = as.factor(ifelse(month %in% c("dec","sep","mar","oct","apr","nov"),"other",month))) %>%
+  mutate(day_of_week = as.factor(day_of_week)) %>%
+  mutate(poutcome = as.factor(poutcome)) %>%
+  mutate(y = as.factor(y))
+
+nearZeroVar(bankfull, saveMetrics= TRUE)
+
+```
+
+\  
+
+##### **Highly Correlated Variables**
+```{r code chunk g, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+findCorrelation(cor(bankfull[, which(!colnames(bankfull) %in% c("job","marital","education","default","housing","loan","contact","month","day_of_week","poutcome","y"))]), cutoff = 0.5, names = TRUE)
+
+```
+
+\  
+
+### Predictive Model Creation
+
+Because the observations were all representative of unique clients and independent of each other, the data set was easily partitioned into training and test sets using a 90%/10% split, respectively.
+
+A generalized linear model, the simplest form of logistic regression available in the Caret package, was used in training.  It was fitted on a "ROC" metric using a cross-validation setup with k = 5 as our number of folds.  The model was then used to make predictions on the test set, providing outputs in the form of probabilities.  See below for the respective model coefficients.
+
+\  
+
+##### **Summary of Model Coefficients**
+```{r code chunk, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+#look for zero variance/near zero variance & save results
+nzv <- nearZeroVar(bankfull, saveMetrics= TRUE)  #pdays has an NZV with a freqRatio of 90.37 & a percentUnique of 0.065
+#remove nzv
+bankfull <- filter(bankfull[, which(!colnames(bankfull) %in% c("pdays"))])
+
+#find highly correlated variables and remove
+corr.x <- findCorrelation(cor(bankfull[, which(!colnames(bankfull) %in% c("job","marital","education","default","housing","loan","contact","month","day_of_week","poutcome","y"))]), cutoff = 0.5, names = TRUE)
+df1 <- bankfull[, which(!colnames(bankfull) %in% c(corr.x))]
+
+#data partitioning at 10% test / 90% train
+set.seed(88)
+trainIndex <- createDataPartition(df1$y, p = .9, 
+                                  list = FALSE, 
+                                  times = 1)
+bankTrain <- df1[ trainIndex,]
+bankTest <- df1[-trainIndex,]
+
+
+# set control & build sample model
+myControl <- trainControl(
+  method = "cv",
+  number = 5,
+  summaryFunction = twoClassSummary,
+  classProbs = TRUE,
+  verboseIter = FALSE
+)
+
+mod1 <- train(factor(y) ~ ., data = bankTrain, method = "glm", trControl = myControl, metric="ROC")
+
+p <- predict(mod1, bankTest, type = "prob")
+#hist(p$yes)
+summary(mod1)
+
+```
+
+\  
+
+### Model Evaluation
+
+The results of our predictions can be seen below.  An initial look at the test prediction probabilities (p) provided a reasonable looking frequency histogram, with a majority of the observations at a very low probability (indicative of a "no" in the y variable, reflective of what we saw in the training data).
+
+```{r code chunk i, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+hist(p$yes)
+
+```
+
+Evaluation of model performance was performed in a couple of different ways: ROC and a precision/recall curve.  These approaches were exploratory methods to visualize the different ways to determine threshold value for our predictions.
+
+The first approach used was an ROC curve.
+
+```{r code chunk a, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+#plot ROC curve
+predobject <- ROCR::prediction(p$yes, bankTest$y)
+rocobject <- ROCR::performance(predobject,  "tpr", "fpr")
+plot(rocobject, colorize=TRUE)
+```
+
+We can see from this curve that the optimal balance of true positives and false positive occurs where the blue line begins to darken, at about 0.2.  From a quick check of the AUC, we see that the area under the curve is about .9114, which is much higher than 0.5. So, this model adequately differentiates between "yes" and "no.""
+
+The second approach involved plotting a curve of precision vs recall.
+
+```{r code chunk b, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+probject<- ROCR::performance(predobject, "prec", "rec")
+plot(probject, colorize=TRUE)
+abline(h = 0.6)
+```
+
+This curve shows an optimal balance of precision and recall at 0.6 precision, 0.4 recall, the green area of the curve, giving us a threshold value of 0.5, very different from the 0.2 yieled by the ROC approach.
+
+In this case, we are solving a marketing problem in trying to determine which types of customers to target.  Since this problem is more concerned with marketing to the most inclusive and correct subset of customers, it is focused on determining the optimal number of true positives.  For this reason, the ROC curve is the best approach for thresholding since it best allows us to prioritize this measure.
+
+\  
+
+### Conclusion and Recommendations
+
+In order to predict the target customers for future Portuguese bank telemarketing campaigns, a generalized linear model with a threshold value of 0.2 is sufficient to predict customers who will subscribe to a term deposit option with an accuracy rate of 83%.  See below for model results against the test set.
+
+\  
+
+##### **Confusion Matrix**
+```{r code chunk j, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE}
+#table(bankTest$y, p$yes < 0.2)
+```
+
+y | False | True
+------------- | ------------- | -------------
+no | 347 | 3307
+yes | 352 | 112
+
+
+\  
+
+We can see from this confusion matrix that we have 112 true positives, 352 false positives, 3307 true negatives, and 347 false negatives.  That gives us a sensitivity rate of 24.4%, a specificity rate of 90.4%, and a total accuracy rate of 83.0%.
+
+Based on the accuracy of the model created and tested in this study, implementation of a standard logistic regression for predicting potential customers to subscribe to a term deposit option might be recommended. The model created in this study generates a prediction that is 83% accurate. However, the model has a much higher specificity than sensitivity rate, meaning it is more successful at detecting true negatives than true positives.  Given these statistics, the best use of this model would be to rule out all predicted "no" values from the y value, and focus future marketing campaigns on the remaining subset of clients.
+
+
+\  
+
+### References
+
+1. [Moro et al., 2014] S. Moro, P. Cortez and P. Rita. A Data-Driven Approach to Predict the Success of Bank Telemarketing. Decision Support Systems, Elsevier, 62:22-31, June 2014
